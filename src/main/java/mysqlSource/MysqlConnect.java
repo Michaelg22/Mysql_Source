@@ -6,7 +6,6 @@ import com.github.shyiko.mysql.binlog.BinaryLogClient;
 import com.github.shyiko.mysql.binlog.event.EventData;
 
 import io.cloudevents.core.builder.CloudEventBuilder;
-import io.cloudevents.core.message.MessageReader;
 import io.cloudevents.http.vertx.VertxMessageFactory;
 import io.cloudevents.jackson.JsonFormat;
 import io.vertx.core.Future;
@@ -58,7 +57,7 @@ public class MysqlConnect {
         BinaryLogClient client = new BinaryLogClient(address, sqlPort, username, password);
         client.registerEventListener(event -> {
             EventData data = event.getData();
-
+            //System.out.println(data);
             if (null != data) {
                 String fun = null;
 
@@ -105,18 +104,20 @@ public class MysqlConnect {
                             allData = allData + y;
                             numArray++;
                         }
-                        //split the data again and change it in the correct format for mysql.
+                        //remove the extra special character.
                         String[] dataArray = allData.toString().split("[\\[|\\]]");
                         int numData = 0;
                         for (int i = 1; i <= numEntry; i++) {
                             numData++;
 
-                                String y = dataArray[numData];
-                                rowData = rowData +  y + "*";
+                            String y = dataArray[numData];
+                            rowData = rowData + y + "*";
 
                             numData++;
 
                         }
+
+
                     }
                 }
 
@@ -125,74 +126,118 @@ public class MysqlConnect {
                 boolean UpdateTrue = eventData.contains(UpdateRows);
                 if (UpdateTrue) {
                     fun = "update";
-                    System.out.println(eventData);
+                    boolean rowsTrue = splitStr.contains("rows=");
+                    if (rowsTrue) {
+
+                        String[] strArray = splitStr.split("=");
+                        String x = strArray[5] + strArray[6];
 
 
-                    String rows = "rows=";
-                    boolean rowsTrue = splitStr.contains(rows);
+                        int numEntry = strArray.length;
+                        //remove extra rows
+                        numEntry = numEntry - 5;
+                        numEntry = numEntry /2;
+
+                        //remove the extra special character.
+                        String[] dataArray = x.split("[\\[|\\]]");
+                        int numData = 0;
+                        /*
+                        <-------need to be changed ------->
+                         */
+                        System.out.println(numEntry);
+                        for (int i = 0; i <= numEntry; i++) {
+                            numData++;
+
+                            String y = dataArray[numData];
+                            numData++;
+                            String z = dataArray[numData];
+                            rowData = rowData + "before: "+ y +" After: "+ z + "*";
+
+                            numData++;
+
+                        }
+                        /*
+                        Need to transform the data correctly. separate with before and after change to fit in
+                        the js model lower. fit before and after data I need to skip one example
+                        *col 1 = 0:2 col 2 = 1:3* after repeat the process for each entry,
+                        before. before col1 after col1, before col2 after col2*...
+                         */
+
+                    }
+
+                }
+
+
+                //delete event
+                String DelRows = "DeleteRowsEventData";
+                boolean DelTrue = eventData.contains(DelRows);
+                if (DelTrue) {
+                    fun = "delete";
+
+                    boolean rowsTrue = splitStr.contains("rows=");
                     if (rowsTrue) {
                         String[] strArray = splitStr.split("=");
-                        //need to be continued
-                        System.out.println(strArray[1]);
+                        String x = strArray[3];
+                        String[] xArray = x.split("\n");
+                        int numEntry = xArray.length;
+                        //remove extra rows, first and last row
+                        numEntry = numEntry - 2;
+                        //Count the amount of entries and add them in one string.
+                        String allData = "";
+                        int numArray = 1;
+                        for (int i = 1; i <= numEntry; i++) {
+                            String y = xArray[numArray];
+                            allData = allData + y;
+                            numArray++;
+                        }
+                        //remove the extra special character.
+                        String[] dataArray = allData.toString().split("[\\[|\\]]");
+                        int numData = 0;
+                        for (int i = 1; i <= numEntry; i++) {
+                            numData++;
+
+                            String y = dataArray[numData];
+                            rowData = rowData + y + "*";
+
+                            numData++;
+
+                        }
+
+
                     }
                 }
 
-                //delete event npt functioning...
-                String DelRows = "DeleteRowsEventData";
-                boolean DelTrue = eventData.contains(DelRows);
-                if (DelTrue)
-                    fun = "delete";
-                // To be continued
-
-
-                if (null != fun) {
+                if(null != fun){
                     //transform data into a jsObject
-                    int colNum = 2;
-                    String colName;
-                    String dataToJs = "";
-                    int x = 0;
-                    String convert;
+                    String colName; // col1, col2, ect...
                     String[] cols = rowData.split("\\*");
                     int entryNum = cols.length;
 
                     JSONObject jsData = new JSONObject();
 
-                    for (int i = 0; i <= entryNum - 1; i++ )
+                    for (int i = 0; i <= entryNum - 1; i++)// prep each entry to be sent as a separate jsObject
                     {
                         jsData.put("Function", fun);
                         jsData.put("Database", database);
                         jsData.put("Table", table);
                         int n = 0;
                         String[] singular = cols[i].split(",");
-                        for(int y = 0; y <= singular.length - 1; y++) {
+                        for (int y = 0; y <= singular.length - 1; y++) // place each col in the jsObject
+                        {
                             n++;
                             colName = "col" + Integer.toString(n);
                             jsData.put(colName, singular[y]);
                         }
-
+                        System.out.println(jsData);
                         // Sent to http server
                         CloudEvent ce = buildEvent(jsData);
                         Future<HttpResponse<Buffer>> responseFuture =
                                 VertxMessageFactory.createWriter(webClient.postAbs(v_target))
                                         .writeStructured(ce, JsonFormat.CONTENT_TYPE);
-                        responseFuture
-                                .map(VertxMessageFactory::createReader) // Let's convert the response to message reader...
-                                .map(MessageReader::toEvent) // ...then to event
-                                .onSuccess(System.out::println) // Print the received message
-                                .onFailure(System.err::println); // Print the eventual failure
-
-
-
-
-                        jsData.clear();
+                        jsData.clear();// clear the jsObject to send the next entry.
                     }
 
-
-
                 }
-
-
-
 
             }
 
