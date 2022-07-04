@@ -121,7 +121,7 @@ public class MysqlConnect {
                     }
                 }
 
-                //Update event not functioning
+                //Update event
                 String UpdateRows = "UpdateRowsEventData";
                 boolean UpdateTrue = eventData.contains(UpdateRows);
                 if (UpdateTrue) {
@@ -149,9 +149,7 @@ public class MysqlConnect {
                             numData++;
 
                             String y = dataArray[numData];
-                            numData++;
-                            String z = dataArray[numData];
-                            rowData = rowData + "before: "+ y +" After: "+ z + "*";
+                            rowData = rowData + y + "*";
 
                             numData++;
 
