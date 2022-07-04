@@ -1,0 +1,19 @@
+{
+  "address": "localhost",
+  "sqlPort": "3306",
+  "username": "root",
+  "password": "Michaelg22",
+
+
+
+  "Database": "xxx",
+  "Table": "products",
+  "col1": "mike",
+  "col2": "blue",
+  "col1": "jess",
+  "col2": "red",
+  "col1": "Kevin",
+  "col2": "yellow"
+}
+
+
